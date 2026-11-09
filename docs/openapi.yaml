@@ -1,0 +1,515 @@
+openapi: 3.1.0
+info:
+  title: VetSync API
+  version: 1.0.0
+  description: >-
+    API REST para gestión de citas y telemedicina veterinaria. Todas las fechas viajan en ISO 8601 y se
+    responden en UTC. Las rutas de administración (/notificaciones) exigen la cabecera X-Token-Admin.
+  license:
+    name: Uso académico
+    identifier: UNLICENSED
+servers:
+  - url: http://localhost:3000/api
+    description: Desarrollo local
+tags:
+  - name: Salud
+    description: Estado del servicio
+  - name: Propietarios
+    description: Dueños de las mascotas
+  - name: Veterinarios
+    description: Veterinarios y su agenda
+  - name: Mascotas
+    description: Mascotas e historial médico
+  - name: Citas
+    description: Agendamiento sin choques de horario
+  - name: Notificaciones
+    description: Recordatorios por correo (simulado); requiere token de administrador
+paths:
+  /salud:
+    get:
+      tags: [Salud]
+      operationId: obtenerSalud
+      security: []
+      summary: Comprueba que el servidor responde
+      responses:
+        '200':
+          description: Servidor en marcha
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [estado]
+                properties:
+                  estado: { type: string, const: ok }
+  /propietarios:
+    post:
+      tags: [Propietarios]
+      operationId: registrarPropietario
+      security: []
+      summary: Registra un propietario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PropietarioNuevo' }
+      responses:
+        '201':
+          description: Propietario creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Propietario' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /propietarios/{id}:
+    get:
+      tags: [Propietarios]
+      operationId: obtenerPropietario
+      security: []
+      summary: Obtiene un propietario
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Propietario
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Propietario' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /veterinarios:
+    post:
+      tags: [Veterinarios]
+      operationId: registrarVeterinario
+      security: []
+      summary: Registra un veterinario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VeterinarioNuevo' }
+      responses:
+        '201':
+          description: Veterinario creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veterinario' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '500': { $ref: '#/components/responses/Interno' }
+    get:
+      tags: [Veterinarios]
+      operationId: listarVeterinarios
+      security: []
+      summary: Lista los veterinarios
+      responses:
+        '200':
+          description: Lista de veterinarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Veterinario' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /veterinarios/{id}:
+    get:
+      tags: [Veterinarios]
+      operationId: obtenerVeterinario
+      security: []
+      summary: Obtiene un veterinario
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Veterinario
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veterinario' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /veterinarios/{id}/agenda:
+    get:
+      tags: [Veterinarios, Citas]
+      operationId: obtenerAgendaVeterinario
+      security: []
+      summary: Citas del veterinario cuyo inicio está en [desde, hasta)
+      description: Incluye citas canceladas. Rango máximo de 31 días.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: desde
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/FechaEntrada' }
+        - name: hasta
+          in: query
+          required: true
+          description: Debe ser posterior a `desde`.
+          schema: { $ref: '#/components/schemas/FechaEntrada' }
+      responses:
+        '200':
+          description: Citas ordenadas por inicio
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Cita' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /mascotas:
+    post:
+      tags: [Mascotas]
+      operationId: registrarMascota
+      security: []
+      summary: Registra una mascota de un propietario existente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MascotaNueva' }
+      responses:
+        '201':
+          description: Mascota creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mascota' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /mascotas/{id}:
+    get:
+      tags: [Mascotas]
+      operationId: obtenerMascota
+      security: []
+      summary: Obtiene una mascota
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Mascota
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mascota' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /mascotas/{id}/historial:
+    post:
+      tags: [Mascotas]
+      operationId: agregarRegistroMedico
+      security: []
+      summary: Agrega un registro al historial médico
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistroMedicoNuevo' }
+      responses:
+        '201':
+          description: Registro creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistroMedico' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+    get:
+      tags: [Mascotas]
+      operationId: obtenerHistorial
+      security: []
+      summary: Historial médico, del más reciente al más antiguo
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Registros médicos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RegistroMedico' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /citas:
+    post:
+      tags: [Citas]
+      operationId: agendarCita
+      security: []
+      summary: Agenda una cita si el veterinario está libre
+      description: >-
+        Hay choque si existe otra cita PROGRAMADA del mismo veterinario con inicio < nuevoFin y
+        fin > nuevoInicio. Las citas contiguas están permitidas. La verificación es atómica.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CitaNueva' }
+      responses:
+        '201':
+          description: Cita programada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cita' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /citas/{id}:
+    get:
+      tags: [Citas]
+      operationId: obtenerCita
+      security: []
+      summary: Obtiene una cita
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Cita
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cita' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /citas/{id}/cancelar:
+    patch:
+      tags: [Citas]
+      operationId: cancelarCita
+      security: []
+      summary: Cancela una cita programada y libera el horario
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Cita cancelada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cita' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /notificaciones:
+    get:
+      tags: [Notificaciones]
+      operationId: listarNotificaciones
+      summary: Últimas notificaciones enviadas (más recientes primero)
+      security: [{ tokenAdmin: [] }]
+      parameters:
+        - name: limite
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Notificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notificacion' }
+        '400': { $ref: '#/components/responses/Validacion' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '500': { $ref: '#/components/responses/Interno' }
+  /notificaciones/recordatorios/ejecutar:
+    post:
+      tags: [Notificaciones]
+      operationId: ejecutarRecordatorios
+      summary: Ejecuta el job de recordatorios (correo simulado)
+      description: >-
+        Envía un recordatorio a cada cita PROGRAMADA que empieza dentro de la ventana configurada y aún
+        no lo tiene. Procesa hasta 200 citas y no se ejecuta dos veces en paralelo.
+      security: [{ tokenAdmin: [] }]
+      responses:
+        '200':
+          description: Resumen de la ejecución
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumenRecordatorios' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '500': { $ref: '#/components/responses/Interno' }
+components:
+  securitySchemes:
+    tokenAdmin:
+      type: apiKey
+      in: header
+      name: X-Token-Admin
+      description: Valor de la variable de entorno TOKEN_ADMIN (mínimo 16 caracteres).
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Entero positivo (en la ruta se acepta como texto de dígitos).
+      schema: { type: integer, minimum: 1 }
+  responses:
+    Validacion:
+      description: Entrada inválida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: Recurso o ruta inexistente
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflicto:
+      description: Email duplicado o choque de horario
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoAutorizado:
+      description: Falta la cabecera X-Token-Admin o es incorrecta
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Prohibido:
+      description: Ruta de administración deshabilitada (TOKEN_ADMIN no configurado)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Interno:
+      description: Error inesperado (sin detalles internos)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [error, mensaje]
+      properties:
+        error:
+          type: string
+          enum: [ErrorValidacion, ErrorNoEncontrado, ErrorConflicto, ErrorNoAutorizado, ErrorProhibido, ErrorInterno]
+        mensaje: { type: string }
+    FechaEntrada:
+      type: string
+      description: >-
+        ISO 8601 con zona horaria (Z u offset ±hh:mm), o sólo fecha (medianoche UTC). La fecha debe existir
+        en el calendario.
+      pattern: '^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2}))?$'
+      examples: ['2026-11-20T15:00:00Z', '2026-11-20T08:00:00-07:00', '2026-11-20']
+    TextoUnaLinea:
+      type: string
+      description: Se recortan espacios; no admite caracteres de control.
+    PropietarioNuevo:
+      type: object
+      required: [nombre, email]
+      properties:
+        nombre: { $ref: '#/components/schemas/TextoUnaLinea', maxLength: 120 }
+        email: { type: string, format: email, maxLength: 160 }
+        telefono: { type: [string, 'null'], maxLength: 30 }
+    Propietario:
+      type: object
+      required: [id, nombre, email, telefono]
+      properties:
+        id: { type: integer, minimum: 1 }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        telefono: { type: [string, 'null'] }
+    VeterinarioNuevo:
+      type: object
+      required: [nombre, email]
+      properties:
+        nombre: { $ref: '#/components/schemas/TextoUnaLinea', maxLength: 120 }
+        email: { type: string, format: email, maxLength: 160 }
+        especialidad: { type: [string, 'null'], maxLength: 80 }
+    Veterinario:
+      type: object
+      required: [id, nombre, email, especialidad]
+      properties:
+        id: { type: integer, minimum: 1 }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        especialidad: { type: [string, 'null'] }
+    MascotaNueva:
+      type: object
+      required: [propietarioId, nombre, especie]
+      properties:
+        propietarioId: { type: integer, minimum: 1 }
+        nombre: { $ref: '#/components/schemas/TextoUnaLinea', maxLength: 80 }
+        especie: { $ref: '#/components/schemas/TextoUnaLinea', maxLength: 40 }
+        raza: { type: [string, 'null'], maxLength: 80 }
+        fechaNacimiento:
+          oneOf:
+            - { $ref: '#/components/schemas/FechaEntrada' }
+            - { type: 'null' }
+          description: No puede ser futura.
+    Mascota:
+      type: object
+      required: [id, propietarioId, nombre, especie, raza, fechaNacimiento]
+      properties:
+        id: { type: integer, minimum: 1 }
+        propietarioId: { type: integer, minimum: 1 }
+        nombre: { type: string }
+        especie: { type: string }
+        raza: { type: [string, 'null'] }
+        fechaNacimiento: { type: [string, 'null'], format: date-time }
+    RegistroMedicoNuevo:
+      type: object
+      required: [diagnostico]
+      properties:
+        diagnostico: { $ref: '#/components/schemas/TextoUnaLinea', maxLength: 255 }
+        veterinarioId: { type: [integer, 'null'], minimum: 1 }
+        fecha:
+          oneOf:
+            - { $ref: '#/components/schemas/FechaEntrada' }
+            - { type: 'null' }
+          description: Por defecto, el instante actual. No puede ser futura.
+        tratamiento: { type: [string, 'null'], maxLength: 5000, description: Admite saltos de línea y tabuladores. }
+        notas: { type: [string, 'null'], maxLength: 5000, description: Admite saltos de línea y tabuladores. }
+    RegistroMedico:
+      type: object
+      required: [id, mascotaId, veterinarioId, fecha, diagnostico, tratamiento, notas]
+      properties:
+        id: { type: integer, minimum: 1 }
+        mascotaId: { type: integer, minimum: 1 }
+        veterinarioId: { type: [integer, 'null'] }
+        fecha: { type: string, format: date-time }
+        diagnostico: { type: string }
+        tratamiento: { type: [string, 'null'] }
+        notas: { type: [string, 'null'] }
+    CitaNueva:
+      type: object
+      required: [mascotaId, veterinarioId, inicio, duracionMinutos, motivo]
+      properties:
+        mascotaId: { type: integer, minimum: 1 }
+        veterinarioId: { type: integer, minimum: 1 }
+        inicio:
+          $ref: '#/components/schemas/FechaEntrada'
+          description: Estrictamente futura y a no más de 365 días.
+        duracionMinutos: { type: integer, minimum: 1, maximum: 240 }
+        motivo: { $ref: '#/components/schemas/TextoUnaLinea', minLength: 1, maxLength: 255 }
+        modalidad: { $ref: '#/components/schemas/Modalidad' }
+    Modalidad:
+      type: string
+      enum: [PRESENCIAL, TELEMEDICINA]
+      default: PRESENCIAL
+    Cita:
+      type: object
+      required: [id, mascotaId, veterinarioId, inicio, fin, motivo, modalidad, estado, recordatorioEnviadoEn]
+      properties:
+        id: { type: integer, minimum: 1 }
+        mascotaId: { type: integer, minimum: 1 }
+        veterinarioId: { type: integer, minimum: 1 }
+        inicio: { type: string, format: date-time }
+        fin: { type: string, format: date-time }
+        motivo: { type: string }
+        modalidad: { $ref: '#/components/schemas/Modalidad' }
+        estado: { type: string, enum: [PROGRAMADA, CANCELADA, COMPLETADA] }
+        recordatorioEnviadoEn: { type: [string, 'null'], format: date-time }
+    Notificacion:
+      type: object
+      required: [id, citaId, destinatario, asunto, cuerpo, enviadoEn]
+      properties:
+        id: { type: integer, minimum: 1 }
+        citaId: { type: integer, minimum: 1 }
+        destinatario: { type: string, format: email }
+        asunto: { type: string }
+        cuerpo: { type: string }
+        enviadoEn: { type: string, format: date-time }
+    ResumenRecordatorios:
+      type: object
+      required: [enviados, fallidos]
+      properties:
+        enviados: { type: integer, minimum: 0 }
+        fallidos: { type: integer, minimum: 0 }
